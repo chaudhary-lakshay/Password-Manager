@@ -1,5 +1,6 @@
 package PasswordManager;
 
+import javax.crypto.AEADBadTagException;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
@@ -8,7 +9,6 @@ import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Base64;
 
 /**
@@ -25,6 +25,7 @@ public class CryptoUtil {
     private static final int PBKDF2_ITERATIONS = 600_000;
     private static final int KEY_LENGTH_BITS = 256;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String VERIFIER_PLAINTEXT = "vault-ok";
 
     private final SecretKey secretKey;
 
@@ -38,6 +39,8 @@ public class CryptoUtil {
         return salt;
     }
 
+    // The caller owns masterPassword and is responsible for zeroing it after
+    // use — this method only clears its own internal PBEKeySpec copy.
     private static SecretKey deriveKey(char[] password, byte[] salt) throws Exception {
         PBEKeySpec spec = new PBEKeySpec(password, salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS);
         try {
@@ -46,7 +49,6 @@ public class CryptoUtil {
             return new SecretKeySpec(keyBytes, "AES");
         } finally {
             spec.clearPassword();
-            Arrays.fill(password, '\0');
         }
     }
 
@@ -89,5 +91,29 @@ public class CryptoUtil {
         byte[] decrypted = cipher.doFinal(ciphertext);
 
         return new String(decrypted, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Encrypts a known constant with this instance's key. The result can
+     * later be handed to {@link #verify(String)} — derived from the same
+     * password and salt — to confirm the password was typed correctly.
+     */
+    public String createVerifier() throws Exception {
+        return encrypt(VERIFIER_PLAINTEXT);
+    }
+
+    /**
+     * Checks whether this instance's key can correctly decrypt a verifier
+     * blob produced by {@link #createVerifier()}. A wrong master password
+     * derives a different key, so GCM's authentication tag check fails
+     * with {@link AEADBadTagException} instead of returning garbage —
+     * that failure is what tells us the password was wrong.
+     */
+    public boolean verify(String verifierBlob) throws Exception {
+        try {
+            return VERIFIER_PLAINTEXT.equals(decrypt(verifierBlob));
+        } catch (AEADBadTagException e) {
+            return false;
+        }
     }
 }

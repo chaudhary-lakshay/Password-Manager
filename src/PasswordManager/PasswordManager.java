@@ -1,5 +1,6 @@
 package PasswordManager;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -15,16 +16,32 @@ public class PasswordManager {
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
 
-        System.out.print("Set a master password: ");
-        char[] masterPassword = scanner.nextLine().toCharArray();
-
         // A fresh random salt each run means the derived key changes every
         // session; since passwordStore is in-memory only, this is fine —
         // there is nothing persisted that would need the same salt later.
         byte[] salt = CryptoUtil.generateSalt();
-        CryptoUtil cryptoUtil = new CryptoUtil(masterPassword, salt);
 
-        PasswordManager manager = new PasswordManager(cryptoUtil);
+        System.out.print("Set a master password: ");
+        char[] masterPassword = scanner.nextLine().toCharArray();
+        CryptoUtil cryptoUtil = new CryptoUtil(masterPassword, salt);
+        String verifier = cryptoUtil.createVerifier();
+
+        CryptoUtil confirmedCryptoUtil = null;
+        while (confirmedCryptoUtil == null) {
+            System.out.print("Confirm master password: ");
+            char[] confirmPassword = scanner.nextLine().toCharArray();
+            CryptoUtil attempt = new CryptoUtil(confirmPassword, salt);
+
+            if (attempt.verify(verifier)) {
+                confirmedCryptoUtil = attempt;
+            } else {
+                System.out.println("Passwords do not match. Try again.");
+            }
+            Arrays.fill(confirmPassword, '\0');
+        }
+        Arrays.fill(masterPassword, '\0');
+
+        PasswordManager manager = new PasswordManager(confirmedCryptoUtil);
 
         while (true) {
             System.out.println("1. Add Password");
