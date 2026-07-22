@@ -1,5 +1,17 @@
 package PasswordManager;
 
+/*
+ * Educational example of the Java AES API — NOT a real password manager.
+ * The security flaws below are left in deliberately and labeled with FLAW:
+ * comments; the README explains the production-grade fix for each.
+ */
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
@@ -7,6 +19,8 @@ import java.util.Scanner;
 public class PasswordManager {
     private final CryptoUtil cryptoUtil;
     private Map<String, String> passwordStore = new HashMap<>();
+    protected String vaultFile = null;
+
 
     public PasswordManager(CryptoUtil cryptoUtil) {
         this.cryptoUtil = cryptoUtil;
@@ -29,7 +43,9 @@ public class PasswordManager {
         while (true) {
             System.out.println("1. Add Password");
             System.out.println("2. Retrieve Password");
-            System.out.println("3. Exit");
+            System.out.println("3. Load Vault File");
+            System.out.println("4. Save to New Vault File");
+            System.out.println("5. Exit");
             System.out.print("Choose an option: ");
             int choice = scanner.nextInt();
             scanner.nextLine(); // consume newline
@@ -49,6 +65,29 @@ public class PasswordManager {
                     System.out.println("Password: " + retrievedPassword);
                     break;
                 case 3:
+                    System.out.println("Enter file path: ");
+                    String file = scanner.nextLine();
+                    try {
+                        manager.loadVaultFile(file);
+                        System.out.println("Vault file loaded successfully");
+                    } catch (IOException | ClassNotFoundException e) {
+                        System.out.printf("Failed to load file: {}\n", e.getClass());
+                    }
+                    break;
+                case 4:
+                    System.out.println("Enter file path: ");
+                    String newFile = scanner.nextLine();
+                    try {
+                        File f = new File(newFile);
+                        f.createNewFile();
+                        manager.vaultFile = newFile;
+                        manager.saveVaultFile(manager.vaultFile);
+                        System.out.println("Vault Saved Successfully");
+                    } catch (IOException | NullPointerException e) {
+                        System.out.printf("Failed to Save Vault: {}\n", e.getMessage());
+                    }
+                    break;
+                case 5:
                     System.exit(0);
                     break;
                 default:
@@ -68,7 +107,6 @@ public class PasswordManager {
         }
     }
 
-    // Decrypts on read so the caller always gets the original plaintext back.
     public String getPassword(String site) {
         try {
             String encryptedPassword = passwordStore.get(site);
@@ -78,4 +116,27 @@ public class PasswordManager {
             return null;
         }
     }
+
+    private void loadVaultFile(String filePath) throws IOException, ClassNotFoundException {
+
+        try (FileInputStream fileIn = new FileInputStream(filePath);
+            ObjectInputStream in = new ObjectInputStream(fileIn)) {
+            this.passwordStore = (Map<String, String>) in.readObject();
+    
+        } catch (IOException | ClassNotFoundException e) {
+            throw e;
+        }
+    }
+
+    private void saveVaultFile(String filePath) throws IOException {
+        try (FileOutputStream fileOut = new FileOutputStream(filePath);
+            ObjectOutputStream out = new ObjectOutputStream(fileOut)) {
+            out.writeObject(this.passwordStore);
+        } catch (IOException e) {
+            throw e;
+        }
+    }
+
+    
 }
+
