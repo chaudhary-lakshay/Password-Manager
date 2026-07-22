@@ -9,25 +9,24 @@ package PasswordManager;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-<<<<<<< HEAD
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-=======
 import java.util.Base64;
->>>>>>> 857d05f (Use Properties for serialization, fix printf syntax)
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 
 public class PasswordManager {
-    private final CryptoUtil cryptoUtil;
+    private CryptoUtil cryptoUtil;
     private Map<String, String> passwordStore = new HashMap<>();
     protected String vaultFile = null;
+    protected byte[] salt = null;
+    protected char[] masterPassword = null;
 
 
-    public PasswordManager(CryptoUtil cryptoUtil) {
+    public PasswordManager(CryptoUtil cryptoUtil, byte[] salt, char[] masterPassword) {
         this.cryptoUtil = cryptoUtil;
+        this.salt = salt;
+        this.masterPassword = masterPassword;
     }
 
     public static void main(String[] args) throws Exception {
@@ -42,7 +41,7 @@ public class PasswordManager {
         byte[] salt = CryptoUtil.generateSalt();
         CryptoUtil cryptoUtil = new CryptoUtil(masterPassword, salt);
 
-        PasswordManager manager = new PasswordManager(cryptoUtil);
+        PasswordManager manager = new PasswordManager(cryptoUtil, salt, masterPassword);
 
         while (true) {
             System.out.println("1. Add Password");
@@ -128,18 +127,27 @@ public class PasswordManager {
         }
     }
 
-    private void loadVaultFile(String filePath) throws IOException, ClassNotFoundException {
+    private void loadVaultFile(String filePath) throws IOException, ClassNotFoundException, Exception {
         Properties p = new Properties();
         try (var in = new FileInputStream(filePath)) {
-            p.load(in);
+            p.load(in);   
         }
+
+        this.salt = Base64.getDecoder().decode((String) p.get("salt_value"));
+        p.remove("salt_value");// Remove salt value so it isn't added to hashmap
+        this.cryptoUtil = new CryptoUtil(this.masterPassword, salt);
+
         this.passwordStore = new HashMap<>((Map<String, String>) ((Map) p));
     }
 
     private void saveVaultFile(String filePath) throws IOException {
-        Properties p = new Properties();
-        p.putAll(passwordStore);
-        try (var out = new FileOutputStream(filePath)) { p.store(out, "vault"); }
+        Properties pHashMap = new Properties();
+        pHashMap.put("salt_value", Base64.getEncoder().encodeToString(this.salt));
+        pHashMap.putAll(passwordStore);
+
+        try (var out = new FileOutputStream(filePath)) {
+            pHashMap.store(out, "vault");
+        }
     }
 
     
