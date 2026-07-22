@@ -18,14 +18,19 @@ public class PasswordManager {
         System.out.print("Set a master password: ");
         char[] masterPassword = scanner.nextLine().toCharArray();
 
-        // A fresh random salt each run means the derived key changes every
-        // session; since passwordStore is in-memory only, this is fine —
-        // there is nothing persisted that would need the same salt later.
-        byte[] salt = CryptoUtil.generateSalt();
-        CryptoUtil cryptoUtil = new CryptoUtil(masterPassword, salt);
+        CryptoUtil cryptoUtil;
+
+        try {
+            // A fresh random salt each run means the derived key changes every
+            // session; since passwordStore is in-memory only, this is fine —
+            // there is nothing persisted that would need the same salt later.
+            byte[] salt = CryptoUtil.generateSalt();
+            cryptoUtil = new CryptoUtil(masterPassword, salt);
+        } finally {
+            java.util.Arrays.fill(masterPassword, '\0');
+        }
 
         PasswordManager manager = new PasswordManager(cryptoUtil);
-
         while (true) {
             System.out.println("1. Add Password");
             System.out.println("2. Retrieve Password");
