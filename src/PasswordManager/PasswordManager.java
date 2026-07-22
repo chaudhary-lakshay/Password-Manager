@@ -6,14 +6,18 @@ package PasswordManager;
  * comments; the README explains the production-grade fix for each.
  */
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+<<<<<<< HEAD
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+=======
+import java.util.Base64;
+>>>>>>> 857d05f (Use Properties for serialization, fix printf syntax)
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 
 public class PasswordManager {
@@ -69,22 +73,21 @@ public class PasswordManager {
                     String file = scanner.nextLine();
                     try {
                         manager.loadVaultFile(file);
+                        manager.vaultFile = file;
                         System.out.println("Vault file loaded successfully");
                     } catch (IOException | ClassNotFoundException e) {
-                        System.out.printf("Failed to load file: {}\n", e.getClass());
+                        System.out.printf("Failed to load file: %s\n", e.getMessage());
                     }
                     break;
                 case 4:
                     System.out.println("Enter file path: ");
                     String newFile = scanner.nextLine();
                     try {
-                        File f = new File(newFile);
-                        f.createNewFile();
+                        manager.saveVaultFile(newFile);
                         manager.vaultFile = newFile;
-                        manager.saveVaultFile(manager.vaultFile);
-                        System.out.println("Vault Saved Successfully");
+                        System.out.printf("Vault Saved Successfully at %s\n", newFile);
                     } catch (IOException | NullPointerException e) {
-                        System.out.printf("Failed to Save Vault: {}\n", e.getMessage());
+                        System.out.printf("Failed to Save Vault: %s\n", e.getMessage());
                     }
                     break;
                 case 5:
@@ -105,6 +108,14 @@ public class PasswordManager {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        if (this.vaultFile != null) {
+            try {
+                this.saveVaultFile(this.vaultFile);
+            } catch (IOException e) {
+                System.out.printf("Failed to save changes to file: %s\n", e.getMessage());
+            }
+        }
     }
 
     public String getPassword(String site) {
@@ -118,23 +129,17 @@ public class PasswordManager {
     }
 
     private void loadVaultFile(String filePath) throws IOException, ClassNotFoundException {
-
-        try (FileInputStream fileIn = new FileInputStream(filePath);
-            ObjectInputStream in = new ObjectInputStream(fileIn)) {
-            this.passwordStore = (Map<String, String>) in.readObject();
-    
-        } catch (IOException | ClassNotFoundException e) {
-            throw e;
+        Properties p = new Properties();
+        try (var in = new FileInputStream(filePath)) {
+            p.load(in);
         }
+        this.passwordStore = new HashMap<>((Map<String, String>) ((Map) p));
     }
 
     private void saveVaultFile(String filePath) throws IOException {
-        try (FileOutputStream fileOut = new FileOutputStream(filePath);
-            ObjectOutputStream out = new ObjectOutputStream(fileOut)) {
-            out.writeObject(this.passwordStore);
-        } catch (IOException e) {
-            throw e;
-        }
+        Properties p = new Properties();
+        p.putAll(passwordStore);
+        try (var out = new FileOutputStream(filePath)) { p.store(out, "vault"); }
     }
 
     
