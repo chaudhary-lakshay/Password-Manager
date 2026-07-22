@@ -10,12 +10,10 @@ Console app: add site/password pairs, retrieve them. Passwords are AES-encrypted
 
 | Flaw | Why it's a problem | Production-grade fix |
 |---|---|---|
-| Hardcoded key in source code | Anyone with the code can decrypt everything | Derive the key from a master password with PBKDF2 or Argon2 |
-| `Cipher.getInstance("AES")` defaults to ECB mode | ECB leaks patterns — identical plaintexts produce identical ciphertexts | `AES/GCM/NoPadding` with a random IV per entry |
-| No salt or IV | Same input always encrypts to the same output | Random salt + IV stored alongside the ciphertext |
+| ~~Hardcoded key in source code~~ **Fixed** | Anyone with the code can decrypt everything | Key is now derived from a master password via PBKDF2-HMAC-SHA256 with a random salt — see [`CryptoUtil`](src/PasswordManager/CryptoUtil.java) |
+| ~~`Cipher.getInstance("AES")` defaults to ECB mode~~ **Fixed** | ECB leaks patterns — identical plaintexts produce identical ciphertexts | Now uses `AES/GCM/NoPadding` with a random IV per entry — see [`CryptoUtil`](src/PasswordManager/CryptoUtil.java) |
+| ~~No salt or IV~~ **Fixed** | Same input always encrypts to the same output | Random salt (key derivation) and random IV (per encryption) are now generated and stored alongside the ciphertext — see [`CryptoUtil`](src/PasswordManager/CryptoUtil.java) |
 | In-memory `HashMap` only | Nothing is saved — all entries are lost when the program exits | Encrypted vault file or SQLite |
-
-Each flaw is also marked with a `FLAW:` comment at the exact line in [`PasswordManager.java`](src/PasswordManager/PasswordManager.java).
 
 Want to fix one? See the open [good first issues](https://github.com/chaudhary-lakshay/Password-Manager/issues).
 

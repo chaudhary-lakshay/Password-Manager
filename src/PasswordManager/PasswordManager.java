@@ -1,33 +1,31 @@
 package PasswordManager;
 
-/*
- * Educational example of the Java AES API — NOT a real password manager.
- * The security flaws below are left in deliberately and labeled with FLAW:
- * comments; the README explains the production-grade fix for each.
- */
-
-import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
-import javax.crypto.SecretKey;
-import javax.crypto.spec.SecretKeySpec;
-import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Scanner;
 
 public class PasswordManager {
-    // FLAW: "AES" alone means AES/ECB/PKCS5Padding. ECB leaks plaintext
-    // patterns. Real fix: AES/GCM/NoPadding with a random IV per entry.
-    private static final String ALGORITHM = "AES";
-    // FLAW: hardcoded key — anyone with this source can decrypt every entry.
-    // Real fix: derive the key from a master password via PBKDF2/Argon2.
-    private static final byte[] keyValue = new byte[] { 'T', 'h', 'e', 'B', 'e', 's', 't', 'S', 'e', 'c', 'r', 'e', 't', 'K', 'e', 'y' };
-    // FLAW: in-memory only — every entry is lost when the program exits.
+    private final CryptoUtil cryptoUtil;
     private Map<String, String> passwordStore = new HashMap<>();
 
-    public static void main(String[] args) {
-        PasswordManager manager = new PasswordManager();
+    public PasswordManager(CryptoUtil cryptoUtil) {
+        this.cryptoUtil = cryptoUtil;
+    }
+
+    public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
+
+        System.out.print("Set a master password: ");
+        char[] masterPassword = scanner.nextLine().toCharArray();
+
+        // A fresh random salt each run means the derived key changes every
+        // session; since passwordStore is in-memory only, this is fine —
+        // there is nothing persisted that would need the same salt later.
+        byte[] salt = CryptoUtil.generateSalt();
+        CryptoUtil cryptoUtil = new CryptoUtil(masterPassword, salt);
+
+        PasswordManager manager = new PasswordManager(cryptoUtil);
+
         while (true) {
             System.out.println("1. Add Password");
             System.out.println("2. Retrieve Password");
@@ -59,9 +57,10 @@ public class PasswordManager {
         }
     }
 
+    // Encrypts the password before storing it — the store never holds plaintext.
     public void addPassword(String site, String password) {
         try {
-            String encryptedPassword = encrypt(password);
+            String encryptedPassword = cryptoUtil.encrypt(password);
             passwordStore.put(site, encryptedPassword);
             System.out.println("Password added successfully.");
         } catch (Exception e) {
@@ -69,31 +68,14 @@ public class PasswordManager {
         }
     }
 
+    // Decrypts on read so the caller always gets the original plaintext back.
     public String getPassword(String site) {
         try {
             String encryptedPassword = passwordStore.get(site);
-            return encryptedPassword != null ? decrypt(encryptedPassword) : "No password found for this site.";
+            return encryptedPassword != null ? cryptoUtil.decrypt(encryptedPassword) : "No password found for this site.";
         } catch (Exception e) {
             e.printStackTrace();
             return null;
         }
     }
-
-    private String encrypt(String data) throws Exception {
-        SecretKeySpec key = new SecretKeySpec(keyValue, ALGORITHM);
-        Cipher c = Cipher.getInstance(ALGORITHM);
-        c.init(Cipher.ENCRYPT_MODE, key);
-        byte[] encVal = c.doFinal(data.getBytes());
-        return Base64.getEncoder().encodeToString(encVal);
-    }
-
-    private String decrypt(String encryptedData) throws Exception {
-        SecretKeySpec key = new SecretKeySpec(keyValue, ALGORITHM);
-        Cipher c = Cipher.getInstance(ALGORITHM);
-        c.init(Cipher.DECRYPT_MODE, key);
-        byte[] decodedValue = Base64.getDecoder().decode(encryptedData);
-        byte[] decValue = c.doFinal(decodedValue);
-        return new String(decValue);
-    }
 }
-
