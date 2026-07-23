@@ -6,6 +6,7 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.AEADBadTagException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -92,10 +93,10 @@ public class CryptoUtil {
         return encrypt("vault-ok");
     }
 
-    public boolean verify(String verifier) {
+    public boolean verify(String verifier) throws Exception {
         try {
             return "vault-ok".equals(decrypt(verifier));
-        } catch (Exception e) {
+        } catch (AEADBadTagException e) {
             return false;
         }
     }

@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
+import java.util.Arrays;
 
 public class PasswordManager {
     private CryptoUtil cryptoUtil;
@@ -39,7 +40,7 @@ public class PasswordManager {
             cryptoUtil = new CryptoUtil(masterPassword, salt);
             verifier = cryptoUtil.createVerifier();
         } finally {
-            java.util.Arrays.fill(masterPassword, '\0');
+            Arrays.fill(masterPassword, '\0');
         }
 
         PasswordManager manager = new PasswordManager(cryptoUtil, salt);
@@ -76,13 +77,24 @@ public class PasswordManager {
                        manager.loadVaultFile(file);
 
                        while (true) {
-                           System.out.print("Enter master password: ");
+                           System.out.print("Enter master password (press Enter to cancel): ");
                            char[] repeatMasterPassword = scanner.nextLine().toCharArray();
 
+                           if (repeatMasterPassword.length == 0) {
+                               System.out.println("Load cancelled.");
+                               break;
+                           }
+
                            try {
+                               System.out.println("Deriving key...");
                                CryptoUtil testCrypto = new CryptoUtil(repeatMasterPassword, manager.salt);
 
                                if (manager.verifier == null || testCrypto.verify(manager.verifier)) {
+
+                                   if (manager.verifier == null) {
+                                       manager.verifier = testCrypto.createVerifier();
+                                   }
+
                                    manager.cryptoUtil = testCrypto;
                                    manager.vaultFile = file;
                                    System.out.println("Vault file loaded successfully");
@@ -91,7 +103,7 @@ public class PasswordManager {
 
                                System.out.println("Wrong master password. Try again.");
                            } finally {
-                               java.util.Arrays.fill(repeatMasterPassword, '\0');
+                               Arrays.fill(repeatMasterPassword, '\0');
                            }
                        }
                     } catch (NullPointerException e) {
