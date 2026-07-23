@@ -13,7 +13,9 @@ Console app: add site/password pairs, retrieve them. Passwords are AES-encrypted
 | ~~Hardcoded key in source code~~ **Fixed** | Anyone with the code can decrypt everything | Key is now derived from a master password via PBKDF2-HMAC-SHA256 with a random salt — see [`CryptoUtil`](src/PasswordManager/CryptoUtil.java) |
 | ~~`Cipher.getInstance("AES")` defaults to ECB mode~~ **Fixed** | ECB leaks patterns — identical plaintexts produce identical ciphertexts | Now uses `AES/GCM/NoPadding` with a random IV per entry — see [`CryptoUtil`](src/PasswordManager/CryptoUtil.java) |
 | ~~No salt or IV~~ **Fixed** | Same input always encrypts to the same output | Random salt (key derivation) and random IV (per encryption) are now generated and stored alongside the ciphertext — see [`CryptoUtil`](src/PasswordManager/CryptoUtil.java) |
-| In-memory `HashMap` only | Nothing is saved — all entries are lost when the program exits | Encrypted vault file or SQLite |
+| ~~In-memory `HashMap` only~~ **Fixed** | Nothing is saved — all entries are lost when the program exits | Entries now persist to a `Properties` vault file with the PBKDF2 salt in its header — see [`PasswordManager`](src/PasswordManager/PasswordManager.java) |
+| No master-password verification | Loading a vault with a mistyped password derives a wrong key silently. Adding an entry then rewrites the file with rows under two different keys, destroying the original — see [#9](https://github.com/chaudhary-lakshay/Password-Manager/issues/9) | Store a verifier blob in the vault header; decrypt it on unlock and let GCM's tag check reject a wrong password ([#5](https://github.com/chaudhary-lakshay/Password-Manager/issues/5)) |
+| Vault file written with default permissions | Any other user on the machine can read the vault. The contents are encrypted, but that is not a reason to leave it world-readable | Restrict to owner-only (`0600`) on write |
 
 Want to fix one? See the open [good first issues](https://github.com/chaudhary-lakshay/Password-Manager/issues).
 
