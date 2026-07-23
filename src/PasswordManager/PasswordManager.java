@@ -53,8 +53,17 @@ public class PasswordManager {
             System.out.println("4. Save to New Vault File");
             System.out.println("5. Exit");
             System.out.print("Choose an option: ");
-            int choice = scanner.nextInt();
-            scanner.nextLine(); // consume newline
+            int choice=0;
+
+            try 
+            {
+                choice = Integer.parseInt(scanner.nextLine().trim());
+            } 
+            catch (NumberFormatException e) 
+            {
+                System.out.println("Invalid input! Please enter a valid option number (1-5).\n");
+                continue; // Restarts the loop to show the menu again
+            }
 
             switch (choice) {
                 case 1:
