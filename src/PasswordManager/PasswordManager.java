@@ -1,15 +1,24 @@
 package PasswordManager;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 
 public class PasswordManager {
-    private final CryptoUtil cryptoUtil;
+    private CryptoUtil cryptoUtil;
     private Map<String, String> passwordStore = new HashMap<>();
+    protected String vaultFile = null;
+    protected byte[] salt = null;
 
-    public PasswordManager(CryptoUtil cryptoUtil) {
+
+    public PasswordManager(CryptoUtil cryptoUtil, byte[] salt) {
         this.cryptoUtil = cryptoUtil;
+        this.salt = salt;
     }
 
     public static void main(String[] args) throws Exception {
@@ -24,12 +33,14 @@ public class PasswordManager {
         byte[] salt = CryptoUtil.generateSalt();
         CryptoUtil cryptoUtil = new CryptoUtil(masterPassword, salt);
 
-        PasswordManager manager = new PasswordManager(cryptoUtil);
+        PasswordManager manager = new PasswordManager(cryptoUtil, salt);
 
         while (true) {
             System.out.println("1. Add Password");
             System.out.println("2. Retrieve Password");
-            System.out.println("3. Exit");
+            System.out.println("3. Load Vault File");
+            System.out.println("4. Save to New Vault File");
+            System.out.println("5. Exit");
             System.out.print("Choose an option: ");
             int choice = scanner.nextInt();
             scanner.nextLine(); // consume newline
@@ -49,6 +60,35 @@ public class PasswordManager {
                     System.out.println("Password: " + retrievedPassword);
                     break;
                 case 3:
+                    System.out.println("Enter file path: ");
+                    String file = scanner.nextLine();
+                    try {
+                        manager.loadVaultFile(file);
+                        manager.vaultFile = file;
+                        System.out.println("Vault file loaded successfully");
+
+                        System.out.print("Enter master password: ");
+                        char[] repeatMasterPassword = scanner.nextLine().toCharArray();
+
+                        manager.cryptoUtil = new CryptoUtil(repeatMasterPassword, manager.salt);
+                    } catch (NullPointerException e) {
+                        System.out.println("not a valid vault file");
+                    } catch (Exception e) {
+                        System.out.printf("failed to load vault file: %s\n", e.getMessage());
+                    }
+                    break;
+                case 4:
+                    System.out.println("Enter file path: ");
+                    String newFile = scanner.nextLine();
+                    try {
+                        manager.saveVaultFile(newFile);
+                        manager.vaultFile = newFile;
+                        System.out.printf("Vault Saved Successfully at %s\n", newFile);
+                    } catch (IOException e) {
+                        System.out.printf("Failed to Save Vault: %s\n", e.getMessage());
+                    }
+                    break;
+                case 5:
                     System.exit(0);
                     break;
                 default:
@@ -66,9 +106,16 @@ public class PasswordManager {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        if (this.vaultFile != null) {
+            try {
+                this.saveVaultFile(this.vaultFile);
+            } catch (IOException e) {
+                System.out.printf("Failed to save changes to file: %s\n", e.getMessage());
+            }
+        }
     }
 
-    // Decrypts on read so the caller always gets the original plaintext back.
     public String getPassword(String site) {
         try {
             String encryptedPassword = passwordStore.get(site);
@@ -78,4 +125,35 @@ public class PasswordManager {
             return null;
         }
     }
+
+    private void loadVaultFile(String filePath) throws Exception {
+        Properties p = new Properties();
+        try (var in = new FileInputStream(filePath)) {
+            p.load(in);   
+        }
+        
+        this.salt = Base64.getDecoder().decode((String) p.get("salt_value"));
+        p.remove("salt_value");// Remove salt value so it isn't added to hashmap
+
+        Map<String, String> newPasswordStore = new HashMap<>();
+        for (String item : p.stringPropertyNames()) {
+            newPasswordStore.put(item, p.getProperty(item));
+        }
+
+        this.passwordStore = newPasswordStore;
+    }
+
+    private void saveVaultFile(String filePath) throws IOException {
+        Properties pHashMap = new Properties();
+        pHashMap.put("salt_value", Base64.getEncoder().encodeToString(this.salt));
+        pHashMap.putAll(passwordStore);
+
+        // TODO: Restrict file permissions
+        try (var out = new FileOutputStream(filePath)) {
+            pHashMap.store(out, "vault");
+        }
+    }
+
+    
 }
+
