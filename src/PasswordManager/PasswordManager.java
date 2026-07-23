@@ -1,11 +1,5 @@
 package PasswordManager;
 
-/*
- * Educational example of the Java AES API — NOT a real password manager.
- * The security flaws below are left in deliberately and labeled with FLAW:
- * comments; the README explains the production-grade fix for each.
- */
-
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -20,13 +14,11 @@ public class PasswordManager {
     private Map<String, String> passwordStore = new HashMap<>();
     protected String vaultFile = null;
     protected byte[] salt = null;
-    protected char[] masterPassword = null;
 
 
-    public PasswordManager(CryptoUtil cryptoUtil, byte[] salt, char[] masterPassword) {
+    public PasswordManager(CryptoUtil cryptoUtil, byte[] salt) {
         this.cryptoUtil = cryptoUtil;
         this.salt = salt;
-        this.masterPassword = masterPassword;
     }
 
     public static void main(String[] args) throws Exception {
@@ -41,7 +33,7 @@ public class PasswordManager {
         byte[] salt = CryptoUtil.generateSalt();
         CryptoUtil cryptoUtil = new CryptoUtil(masterPassword, salt);
 
-        PasswordManager manager = new PasswordManager(cryptoUtil, salt, masterPassword);
+        PasswordManager manager = new PasswordManager(cryptoUtil, salt);
 
         while (true) {
             System.out.println("1. Add Password");
@@ -74,8 +66,15 @@ public class PasswordManager {
                         manager.loadVaultFile(file);
                         manager.vaultFile = file;
                         System.out.println("Vault file loaded successfully");
-                    } catch (IOException | ClassNotFoundException e) {
-                        System.out.printf("Failed to load file: %s\n", e.getMessage());
+
+                        System.out.print("Enter master password: ");
+                        char[] repeatMasterPassword = scanner.nextLine().toCharArray();
+
+                        manager.cryptoUtil = new CryptoUtil(repeatMasterPassword, manager.salt);
+                    } catch (NullPointerException e) {
+                        System.out.println("not a valid vault file");
+                    } catch (Exception e) {
+                        System.out.printf("failed to load vault file: %s\n", e.getMessage());
                     }
                     break;
                 case 4:
@@ -85,7 +84,7 @@ public class PasswordManager {
                         manager.saveVaultFile(newFile);
                         manager.vaultFile = newFile;
                         System.out.printf("Vault Saved Successfully at %s\n", newFile);
-                    } catch (IOException | NullPointerException e) {
+                    } catch (IOException e) {
                         System.out.printf("Failed to Save Vault: %s\n", e.getMessage());
                     }
                     break;
@@ -127,17 +126,21 @@ public class PasswordManager {
         }
     }
 
-    private void loadVaultFile(String filePath) throws IOException, ClassNotFoundException, Exception {
+    private void loadVaultFile(String filePath) throws Exception {
         Properties p = new Properties();
         try (var in = new FileInputStream(filePath)) {
             p.load(in);   
         }
-
+        
         this.salt = Base64.getDecoder().decode((String) p.get("salt_value"));
         p.remove("salt_value");// Remove salt value so it isn't added to hashmap
-        this.cryptoUtil = new CryptoUtil(this.masterPassword, salt);
 
-        this.passwordStore = new HashMap<>((Map<String, String>) ((Map) p));
+        Map<String, String> newPasswordStore = new HashMap<>();
+        for (String item : p.stringPropertyNames()) {
+            newPasswordStore.put(item, p.getProperty(item));
+        }
+
+        this.passwordStore = newPasswordStore;
     }
 
     private void saveVaultFile(String filePath) throws IOException {
@@ -145,6 +148,7 @@ public class PasswordManager {
         pHashMap.put("salt_value", Base64.getEncoder().encodeToString(this.salt));
         pHashMap.putAll(passwordStore);
 
+        // TODO: Restrict file permissions
         try (var out = new FileOutputStream(filePath)) {
             pHashMap.store(out, "vault");
         }
