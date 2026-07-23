@@ -14,7 +14,7 @@ public class PasswordManager {
     private Map<String, String> passwordStore = new HashMap<>();
     protected String vaultFile = null;
     protected byte[] salt = null;
-
+    protected String verifier = null;
 
     public PasswordManager(CryptoUtil cryptoUtil, byte[] salt) {
         this.cryptoUtil = cryptoUtil;
@@ -28,18 +28,22 @@ public class PasswordManager {
         char[] masterPassword = scanner.nextLine().toCharArray();
 
         CryptoUtil cryptoUtil;
+        byte[] salt;
+        String verifier;
 
         try {
             // A fresh random salt each run means the derived key changes every
             // session; since passwordStore is in-memory only, this is fine —
             // there is nothing persisted that would need the same salt later.
-            byte[] salt = CryptoUtil.generateSalt();
+            salt = CryptoUtil.generateSalt();
             cryptoUtil = new CryptoUtil(masterPassword, salt);
+            verifier = cryptoUtil.createVerifier();
         } finally {
             java.util.Arrays.fill(masterPassword, '\0');
         }
 
         PasswordManager manager = new PasswordManager(cryptoUtil, salt);
+        manager.verifier = verifier;
 
         while (true) {
             System.out.println("1. Add Password");
@@ -69,14 +73,27 @@ public class PasswordManager {
                     System.out.println("Enter file path: ");
                     String file = scanner.nextLine();
                     try {
-                        manager.loadVaultFile(file);
-                        manager.vaultFile = file;
-                        System.out.println("Vault file loaded successfully");
+                       manager.loadVaultFile(file);
 
-                        System.out.print("Enter master password: ");
-                        char[] repeatMasterPassword = scanner.nextLine().toCharArray();
+                       while (true) {
+                           System.out.print("Enter master password: ");
+                           char[] repeatMasterPassword = scanner.nextLine().toCharArray();
 
-                        manager.cryptoUtil = new CryptoUtil(repeatMasterPassword, manager.salt);
+                           try {
+                               CryptoUtil testCrypto = new CryptoUtil(repeatMasterPassword, manager.salt);
+
+                               if (manager.verifier == null || testCrypto.verify(manager.verifier)) {
+                                   manager.cryptoUtil = testCrypto;
+                                   manager.vaultFile = file;
+                                   System.out.println("Vault file loaded successfully");
+                                   break;
+                               }
+
+                               System.out.println("Wrong master password. Try again.");
+                           } finally {
+                               java.util.Arrays.fill(repeatMasterPassword, '\0');
+                           }
+                       }
                     } catch (NullPointerException e) {
                         System.out.println("not a valid vault file");
                     } catch (Exception e) {
@@ -139,8 +156,10 @@ public class PasswordManager {
         }
         
         this.salt = Base64.getDecoder().decode((String) p.get("salt_value"));
-        p.remove("salt_value");// Remove salt value so it isn't added to hashmap
+        this.verifier = (String) p.get("verifier");
 
+        p.remove("salt_value");
+        p.remove("verifier");
         Map<String, String> newPasswordStore = new HashMap<>();
         for (String item : p.stringPropertyNames()) {
             newPasswordStore.put(item, p.getProperty(item));
@@ -152,6 +171,11 @@ public class PasswordManager {
     private void saveVaultFile(String filePath) throws IOException {
         Properties pHashMap = new Properties();
         pHashMap.put("salt_value", Base64.getEncoder().encodeToString(this.salt));
+
+        if (this.verifier != null) {
+            pHashMap.put("verifier", this.verifier);
+        }
+
         pHashMap.putAll(passwordStore);
 
         // TODO: Restrict file permissions

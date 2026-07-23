@@ -88,4 +88,16 @@ public class CryptoUtil {
 
         return new String(decrypted, StandardCharsets.UTF_8);
     }
+    public String createVerifier() throws Exception {
+        return encrypt("vault-ok");
+    }
+
+    public boolean verify(String verifier) {
+        try {
+            return "vault-ok".equals(decrypt(verifier));
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }
+
