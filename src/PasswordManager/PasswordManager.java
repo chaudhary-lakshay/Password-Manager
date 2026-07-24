@@ -1,14 +1,21 @@
 package PasswordManager;
 
+import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.Arrays;
+import java.util.Set;
 
 public class PasswordManager {
     private CryptoUtil cryptoUtil;
@@ -190,12 +197,46 @@ public class PasswordManager {
 
         pHashMap.putAll(passwordStore);
 
-        // TODO: Restrict file permissions
-        try (var out = new FileOutputStream(filePath)) {
+        Path vaultPath = Path.of(filePath);
+        restrictVaultFilePermissions(vaultPath);
+        try (OutputStream out = Files.newOutputStream(vaultPath)) {
             pHashMap.store(out, "vault");
         }
     }
 
-    
+    private static void restrictVaultFilePermissions(Path vaultPath) throws IOException {
+        Set<PosixFilePermission> ownerOnly = PosixFilePermissions.fromString("rw-------");
+
+        try {
+            try {
+                Files.createFile(vaultPath, PosixFilePermissions.asFileAttribute(ownerOnly));
+            } catch (FileAlreadyExistsException ignored) {
+                // Existing vault files should still be tightened before rewriting.
+            }
+            Files.setPosixFilePermissions(vaultPath, ownerOnly);
+        } catch (UnsupportedOperationException e) {
+            restrictVaultFilePermissionsWithoutPosix(vaultPath);
+        }
+    }
+
+    private static void restrictVaultFilePermissionsWithoutPosix(Path vaultPath) throws IOException {
+        try {
+            Files.createFile(vaultPath);
+        } catch (FileAlreadyExistsException ignored) {
+            // Existing vault files should still be tightened before rewriting.
+        }
+
+        File vaultFile = vaultPath.toFile();
+
+        // Non-POSIX platforms such as Windows do not expose a true 0600 mode
+        // through the File API. Apply the closest owner-only settings supported
+        // by the runtime without failing the save when an operation is not
+        // expressible on the current filesystem.
+        vaultFile.setReadable(false, false);
+        vaultFile.setWritable(false, false);
+        vaultFile.setExecutable(false, false);
+        vaultFile.setReadable(true, true);
+        vaultFile.setWritable(true, true);
+    }
 }
 
