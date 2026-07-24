@@ -11,6 +11,9 @@ import java.util.Scanner;
 import java.util.Arrays;
 
 public class PasswordManager {
+
+    private record LoadedVault(byte[] salt, String verifier, Map<String, String> passwordStore) {}
+
     private CryptoUtil cryptoUtil;
     private Map<String, String> passwordStore = new HashMap<>();
     protected String vaultFile = null;
@@ -74,7 +77,7 @@ public class PasswordManager {
                     System.out.println("Enter file path: ");
                     String file = scanner.nextLine();
                     try {
-                       manager.loadVaultFile(file);
+                       LoadedVault loadedVault = manager.loadVaultFile(file);
 
                        while (true) {
                            System.out.print("Enter master password (press Enter to cancel): ");
@@ -87,14 +90,20 @@ public class PasswordManager {
 
                            try {
                                System.out.println("Deriving key...");
-                               CryptoUtil testCrypto = new CryptoUtil(repeatMasterPassword, manager.salt);
+                               CryptoUtil testCrypto = new CryptoUtil(repeatMasterPassword, loadedVault.salt());
 
-                               if (manager.verifier == null || testCrypto.verify(manager.verifier)) {
+                               if (manager.verifier == null || testCrypto.verify(loadedVault.verifier())) {
 
-                                   if (manager.verifier == null) {
-                                       manager.verifier = testCrypto.createVerifier();
+                                   String newVerifier = loadedVault.verifier();
+
+                                   if (newVerifier == null) {
+                                       System.out.println("This vault has no password verification.");
+                                       System.out.println("The password you just entered becomes the one it expects from now on.");
+                                       newVerifier = testCrypto.createVerifier();
                                    }
-
+                                   manager.salt = loadedVault.salt();
+                                   manager.verifier = newVerifier;
+                                   manager.passwordStore = loadedVault.passwordStore();
                                    manager.cryptoUtil = testCrypto;
                                    manager.vaultFile = file;
                                    System.out.println("Vault file loaded successfully");
@@ -161,14 +170,14 @@ public class PasswordManager {
         }
     }
 
-    private void loadVaultFile(String filePath) throws Exception {
+    private LoadedVault loadVaultFile(String filePath) throws Exception {
         Properties p = new Properties();
         try (var in = new FileInputStream(filePath)) {
             p.load(in);   
         }
         
-        this.salt = Base64.getDecoder().decode((String) p.get("salt_value"));
-        this.verifier = (String) p.get("verifier");
+        byte[] salt = Base64.getDecoder().decode((String) p.get("salt_value"));
+        String verifier = (String) p.get("verifier");
 
         p.remove("salt_value");
         p.remove("verifier");
@@ -177,7 +186,7 @@ public class PasswordManager {
             newPasswordStore.put(item, p.getProperty(item));
         }
 
-        this.passwordStore = newPasswordStore;
+        return new LoadedVault(salt, verifier, newPasswordStore);
     }
 
     private void saveVaultFile(String filePath) throws IOException {
@@ -194,8 +203,6 @@ public class PasswordManager {
         try (var out = new FileOutputStream(filePath)) {
             pHashMap.store(out, "vault");
         }
-    }
-
-    
+    } 
 }
 
