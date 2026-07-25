@@ -15,7 +15,7 @@ Console app: add site/password pairs, retrieve them. Passwords are AES-encrypted
 | ~~No salt or IV~~ **Fixed** | Same input always encrypts to the same output | Random salt (key derivation) and random IV (per encryption) are now generated and stored alongside the ciphertext — see [`CryptoUtil`](src/PasswordManager/CryptoUtil.java) |
 | ~~In-memory `HashMap` only~~ **Fixed** | Nothing is saved — all entries are lost when the program exits | Entries now persist to a `Properties` vault file with the PBKDF2 salt in its header — see [`PasswordManager`](src/PasswordManager/PasswordManager.java) |
 | ~~No master-password verification~~ **Fixed** | Loading a vault with a mistyped password derived a wrong key silently, and the next added entry rewrote the file with rows under two different keys | A verifier blob is stored in the vault header; on unlock it is decrypted and GCM's authentication tag check rejects a wrong password — see [`CryptoUtil.verify`](src/PasswordManager/CryptoUtil.java) |
-| Vault file written with default permissions | Any other user on the machine can read the vault. The contents are encrypted, but that is not a reason to leave it world-readable | Restrict to owner-only (`0600`) on write |
+| ~~Vault file written with default permissions~~ **Fixed** | Any other user on the machine could read the vault. The contents are encrypted, but that is not a reason to leave it world-readable | Vault files are created with owner-only permissions (`0600`) on POSIX filesystems, with a best-effort owner read/write fallback on non-POSIX filesystems such as Windows |
 
 Want to fix one? See the open [good first issues](https://github.com/chaudhary-lakshay/Password-Manager/issues).
 
