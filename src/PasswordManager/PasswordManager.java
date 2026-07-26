@@ -61,7 +61,8 @@ public class PasswordManager {
             System.out.println("2. Retrieve Password");
             System.out.println("3. Load Vault File");
             System.out.println("4. Save to New Vault File");
-            System.out.println("5. Exit");
+            System.out.println("5. Delete Password");
+            System.out.println("6. Exit");
             System.out.print("Choose an option: ");
             int choice=0;
 
@@ -71,7 +72,7 @@ public class PasswordManager {
             } 
             catch (NumberFormatException e) 
             {
-                System.out.println("Invalid input! Please enter a valid option number (1-5).\n");
+                System.out.println("Invalid input! Please enter a valid option number (1-6).\n");
                 continue; // Restarts the loop to show the menu again
             }
 
@@ -149,6 +150,11 @@ public class PasswordManager {
                     }
                     break;
                 case 5:
+                    System.out.print("Enter site: ");
+                    site = scanner.nextLine();
+                    manager.deletePassword(site);
+                    break;
+                case 6:
                     System.exit(0);
                     break;
                 default:
@@ -176,10 +182,27 @@ public class PasswordManager {
         }
     }
 
+    public void deletePassword(String site) {
+        if (passwordStore.containsKey(site)) {
+            passwordStore.remove(site);
+            System.out.println("Password deleted successfully.");
+
+            if (this.vaultFile != null) {
+                try {
+                    this.saveVaultFile(this.vaultFile);
+                } catch (IOException e) {
+                    System.out.printf("Failed to save changes to file: %s\n", e.getMessage());
+                }
+            }
+        } else {
+            System.out.println("No password found for this site.");
+        }
+    }
+
     public String getPassword(String site) {
         try {
             String encryptedPassword = passwordStore.get(site);
-            return encryptedPassword != null ? cryptoUtil.decrypt(encryptedPassword) : "No password found for this site.";
+            return encryptedPassword != null ? cryptoUtil.decrypt(encryptedPassword) : "Nothing matched.";
         } catch (Exception e) {
             e.printStackTrace();
             return null;
