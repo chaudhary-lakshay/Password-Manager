@@ -81,7 +81,7 @@ public class PasswordManager {
                     String site = scanner.nextLine();
                     System.out.print("Enter password: ");
                     String password = scanner.nextLine();
-                    manager.addPassword(site, password);
+                    manager.addPassword(site, password, scanner);
                     break;
                 case 2:
                     System.out.print("Enter site: ");
@@ -158,11 +158,30 @@ public class PasswordManager {
     }
 
     // Encrypts the password before storing it — the store never holds plaintext.
-    public void addPassword(String site, String password) {
+    public void addPassword(String site, String password, Scanner scanner) {
         try {
+            boolean exists = passwordStore.containsKey(site);
+
+            if (exists) {
+                System.out.println("A password already exists for this site.");
+                System.out.print("Overwrite it? (y/N): ");
+                String response = scanner.nextLine();
+
+                if (!response.equalsIgnoreCase("y")) {
+                    System.out.println("Update cancelled.");
+                    return;
+                }
+            }
+
             String encryptedPassword = cryptoUtil.encrypt(password);
             passwordStore.put(site, encryptedPassword);
-            System.out.println("Password added successfully.");
+
+            if (exists) {
+                System.out.println("Password updated successfully.");
+            } else {
+                System.out.println("Password added successfully.");
+            }
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -175,7 +194,6 @@ public class PasswordManager {
             }
         }
     }
-
     public String getPassword(String site) {
         try {
             String encryptedPassword = passwordStore.get(site);
@@ -257,3 +275,4 @@ public class PasswordManager {
         vaultFile.setWritable(true, true);
     }
 }
+
