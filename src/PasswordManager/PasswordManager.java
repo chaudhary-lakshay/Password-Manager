@@ -79,9 +79,33 @@ public class PasswordManager {
                 case 1:
                     System.out.print("Enter site: ");
                     String site = scanner.nextLine();
+
+                    boolean exists = manager.hasPassword(site);
+
+                    if (exists) {
+                        System.out.println("A password already exists for this site.");
+                        System.out.print("Overwrite it? (y/N): ");
+                        String response = scanner.nextLine();
+
+                        if (!response.trim().equalsIgnoreCase("y")) {
+                            System.out.println("Update cancelled.");
+                            break;
+                        }
+                    }
+
                     System.out.print("Enter password: ");
                     String password = scanner.nextLine();
-                    manager.addPassword(site, password);
+
+                    boolean added = manager.addPassword(site, password);
+
+                    if (added) {
+                        if (exists) {
+                            System.out.println("Password updated successfully.");
+                        } else {
+                            System.out.println("Password added successfully.");
+                        }
+                    }
+
                     break;
                 case 2:
                     System.out.print("Enter site: ");
@@ -157,23 +181,29 @@ public class PasswordManager {
         }
     }
 
+    public boolean hasPassword(String site) {
+        return passwordStore.containsKey(site);
+    }
+
     // Encrypts the password before storing it — the store never holds plaintext.
-    public void addPassword(String site, String password) {
+    public boolean addPassword(String site, String password) {
         try {
-            String encryptedPassword = cryptoUtil.encrypt(password);
-            passwordStore.put(site, encryptedPassword);
-            System.out.println("Password added successfully.");
+            passwordStore.put(site, cryptoUtil.encrypt(password));
         } catch (Exception e) {
             e.printStackTrace();
+            return false;
         }
 
         if (this.vaultFile != null) {
             try {
                 this.saveVaultFile(this.vaultFile);
             } catch (IOException e) {
-                System.out.printf("Failed to save changes to file: %s\n", e.getMessage());
+                System.out.printf("Password stored, but failed to save to file: %s\n", e.getMessage());
+                return false;
             }
         }
+
+        return true;
     }
 
     public String getPassword(String site) {
