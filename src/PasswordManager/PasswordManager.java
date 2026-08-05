@@ -191,6 +191,7 @@ public class PasswordManager {
             passwordStore.put(site, cryptoUtil.encrypt(password));
         } catch (Exception e) {
             e.printStackTrace();
+            System.out.println("Failed to encrypt password. Entry not saved.");
             return false;
         }
 
