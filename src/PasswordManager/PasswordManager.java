@@ -1,5 +1,6 @@
 package PasswordManager;
 
+import java.io.Console;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -32,11 +33,22 @@ public class PasswordManager {
         this.salt = salt;
     }
 
+    private static char[] readPassword(String prompt, Scanner scanner) {
+        Console console = System.console();
+
+        if (console != null) {
+            return console.readPassword(prompt);
+        }
+
+        System.out.println("No console detected. Your password will be visible as you type.");
+        System.out.print(prompt);
+        return scanner.nextLine().toCharArray();
+    }
+
     public static void main(String[] args) throws Exception {
         Scanner scanner = new Scanner(System.in);
 
-        System.out.print("Set a master password: ");
-        char[] masterPassword = scanner.nextLine().toCharArray();
+        char[] masterPassword = readPassword("Set a master password: ", scanner);
 
         CryptoUtil cryptoUtil;
         byte[] salt;
@@ -122,8 +134,7 @@ public class PasswordManager {
                        LoadedVault loadedVault = manager.loadVaultFile(file);
 
                        while (true) {
-                           System.out.print("Enter master password (press Enter to cancel): ");
-                           char[] repeatMasterPassword = scanner.nextLine().toCharArray();
+                           char[] repeatMasterPassword = readPassword("Enter master password (press Enter to cancel): ", scanner);
 
                            if (repeatMasterPassword.length == 0) {
                                System.out.println("Load cancelled.");

@@ -1,3 +1,0 @@
-# Normalize line endings: store text as LF in the repo
-* text=auto
-*.java text eol=lf
