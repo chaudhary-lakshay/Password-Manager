@@ -32,7 +32,7 @@ public class PasswordManager {
         this.cryptoUtil = cryptoUtil;
         this.salt = salt;
     }
-    
+
     private static char[] readPassword(String prompt, Scanner scanner) {
         Console console = System.console();
 
@@ -73,7 +73,9 @@ public class PasswordManager {
             System.out.println("2. Retrieve Password");
             System.out.println("3. Load Vault File");
             System.out.println("4. Save to New Vault File");
-            System.out.println("5. Exit");
+            System.out.println("5. Delete Password");
+            System.out.println("6. List Saved Sites");
+            System.out.println("7. Exit");
             System.out.print("Choose an option: ");
             int choice=0;
 
@@ -83,7 +85,7 @@ public class PasswordManager {
             } 
             catch (NumberFormatException e) 
             {
-                System.out.println("Invalid input! Please enter a valid option number (1-5).\n");
+                System.out.println("Invalid input! Please enter a valid option number (1-7).\n");
                 continue; // Restarts the loop to show the menu again
             }
 
@@ -91,9 +93,33 @@ public class PasswordManager {
                 case 1:
                     System.out.print("Enter site: ");
                     String site = scanner.nextLine();
+
+                    boolean exists = manager.hasPassword(site);
+
+                    if (exists) {
+                        System.out.println("A password already exists for this site.");
+                        System.out.print("Overwrite it? (y/N): ");
+                        String response = scanner.nextLine();
+
+                        if (!response.trim().equalsIgnoreCase("y")) {
+                            System.out.println("Update cancelled.");
+                            break;
+                        }
+                    }
+
                     System.out.print("Enter password: ");
                     String password = scanner.nextLine();
-                    manager.addPassword(site, password);
+
+                    boolean added = manager.addPassword(site, password);
+
+                    if (added) {
+                        if (exists) {
+                            System.out.println("Password updated successfully.");
+                        } else {
+                            System.out.println("Password added successfully.");
+                        }
+                    }
+
                     break;
                 case 2:
                     System.out.print("Enter site: ");
@@ -160,6 +186,14 @@ public class PasswordManager {
                     }
                     break;
                 case 5:
+                    System.out.print("Enter site: ");
+                    site = scanner.nextLine();
+                    manager.deletePassword(site);
+                    break;
+                case 6:
+                    manager.listSavedSites();
+                    break;
+                case 7:
                     System.exit(0);
                     break;
                 default:
@@ -168,22 +202,49 @@ public class PasswordManager {
         }
     }
 
+    public boolean hasPassword(String site) {
+        return passwordStore.containsKey(site);
+    }
+
     // Encrypts the password before storing it — the store never holds plaintext.
-    public void addPassword(String site, String password) {
+    public boolean addPassword(String site, String password) {
         try {
-            String encryptedPassword = cryptoUtil.encrypt(password);
-            passwordStore.put(site, encryptedPassword);
-            System.out.println("Password added successfully.");
+            passwordStore.put(site, cryptoUtil.encrypt(password));
         } catch (Exception e) {
             e.printStackTrace();
+            System.out.println("Failed to encrypt password. Entry not saved.");
+            return false;
         }
 
         if (this.vaultFile != null) {
             try {
                 this.saveVaultFile(this.vaultFile);
             } catch (IOException e) {
-                System.out.printf("Failed to save changes to file: %s\n", e.getMessage());
+                System.out.printf("Password stored, but failed to save to file: %s\n", e.getMessage());
+                return false;
             }
+        }
+
+        return true;
+    }
+
+    public void deletePassword(String site) {
+        if (passwordStore.containsKey(site)) {
+            passwordStore.remove(site);
+            System.out.println("Password deleted successfully.");
+
+            if (this.vaultFile != null) {
+                try {
+                    this.saveVaultFile(this.vaultFile);
+                } catch (IOException e) {
+                    System.out.printf(
+                        "Failed to save changes to file: %s\n",
+                        e.getMessage()
+                    );
+                }
+            }
+        } else {
+            System.out.println("No password found for this site.");
         }
     }
 
@@ -194,6 +255,18 @@ public class PasswordManager {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    public void listSavedSites() {
+        if (passwordStore.isEmpty()) {
+            System.out.println("No sites saved yet.");
+        } else {
+            System.out.println("Saved sites:");
+            passwordStore.keySet()
+                    .stream()
+                    .sorted()
+                    .forEach(site -> System.out.println("  " + site));
         }
     }
 
