@@ -62,7 +62,8 @@ public class PasswordManager {
             System.out.println("3. Load Vault File");
             System.out.println("4. Save to New Vault File");
             System.out.println("5. Delete Password");
-            System.out.println("6. Exit");
+            System.out.println("6. List Saved Sites");
+            System.out.println("7. Exit");
             System.out.print("Choose an option: ");
             int choice=0;
 
@@ -72,7 +73,7 @@ public class PasswordManager {
             } 
             catch (NumberFormatException e) 
             {
-                System.out.println("Invalid input! Please enter a valid option number (1-6).\n");
+                System.out.println("Invalid input! Please enter a valid option number (1-7).\n");
                 continue; // Restarts the loop to show the menu again
             }
 
@@ -179,6 +180,9 @@ public class PasswordManager {
                     manager.deletePassword(site);
                     break;
                 case 6:
+                    manager.listSavedSites();
+                    break;
+                case 7:
                     System.exit(0);
                     break;
                 default:
@@ -240,6 +244,18 @@ public class PasswordManager {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        }
+    }
+
+    public void listSavedSites() {
+        if (passwordStore.isEmpty()) {
+            System.out.println("No sites saved yet.");
+        } else {
+            System.out.println("Saved sites:");
+            passwordStore.keySet()
+                    .stream()
+                    .sorted()
+                    .forEach(site -> System.out.println("  " + site));
         }
     }
 
